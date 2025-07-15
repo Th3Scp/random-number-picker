@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>💖 HypoArmy 💖</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass-container {
+            background-color: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+        }
+
+        .fade-out {
+            opacity: 0;
+            transition: opacity 1.5s ease-out;
+        }
+
+        .fade-in {
+            opacity: 1;
+            transition: opacity 1s ease-in;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen gap-6">
+
+    <div class="text-center">
+        <div id="slotBox"
+            class="glass-container relative w-64 h-24 overflow-hidden mx-auto border-2 border-yellow-400 rounded-xl">
+            <div id="roller" class="absolute top-0 left-0 w-full text-center text-3xl font-bold text-yellow-300">
+            </div>
+        </div>
+
+        <div id="finalNumber" class="text-6xl font-extrabold text-green-400 mt-8 hidden transition"></div>
+
+        <button id="spinBtn"
+            class="mt-8 px-6 py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition">
+            SPIN 🎯
+        </button>
+
+        <button id="loadBtn" class="mt-8 px-6 py-3 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition">
+            Load Numbers
+        </button>
+    </div>
+
+    <script>
+        const roller = document.getElementById('roller');
+        const slotBox = document.getElementById('slotBox');
+        const spinBtn = document.getElementById('spinBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const finalDisplay = document.getElementById('finalNumber');
+
+        const ITEM_HEIGHT = 48;
+        const TOTAL_ITEMS = 200;
+
+        let position = 0;
+        let idleFrame = null;
+        let isSpinning = false;
+        let isIdle = true;
+        let speed = 0.5;
+
+        // ---------- [🔹 Load JSON to localStorage] ----------
+        loadBtn.addEventListener('click', async () => {
+            try {
+                const res = await fetch('./numbers.json');
+                const numbers = await res.json();
+                localStorage.setItem('availableNumbers', JSON.stringify(numbers));
+                localStorage.setItem('usedNumbers', JSON.stringify([]));
+                alert(`شماره‌ها با موفقیت لود شدند.\nتعداد: ${numbers.length} عدد`);
+                fillRoller(numbers);
+            } catch (e) {
+                alert('خطا در لود فایل JSON');
+            }
+        });
+
+
+        // ---------- [🔹 Fill Roller View] ----------
+        function fillRoller(numbers) {
+            roller.innerHTML = '';
+            for (let i = 0; i < TOTAL_ITEMS; i++) {
+                const item = document.createElement('div');
+                item.className = 'py-2';
+                item.textContent = numbers[i % numbers.length];
+                roller.appendChild(item);
+            }
+        }
+
+        // ---------- [🔹 Scroll Idle] ----------
+        function startIdleScroll() {
+            isIdle = true;
+            function scroll() {
+                if (!isIdle) return;
+                position += speed;
+                if (position >= roller.scrollHeight - ITEM_HEIGHT) position = 0;
+                roller.style.transform = `translateY(-${position}px)`;
+                idleFrame = requestAnimationFrame(scroll);
+            }
+            scroll();
+        }
+
+        function stopIdleScroll() {
+            isIdle = false;
+            cancelAnimationFrame(idleFrame);
+        }
+
+        // ---------- [🔹 SPIN Action] ----------
+        function spin() {
+            if (isSpinning) return;
+
+            const available = JSON.parse(localStorage.getItem('availableNumbers') || '[]');
+            const used = JSON.parse(localStorage.getItem('usedNumbers') || '[]');
+
+            const remaining = available.filter(n => !used.includes(n));
+
+            if (remaining.length === 0) {
+                finalDisplay.textContent = '🎉 همه شماره‌ها استفاده شدند!';
+                finalDisplay.classList.remove('hidden');
+                finalDisplay.classList.add('fade-in');
+                return;
+            }
+
+            const finalNumber = remaining[Math.floor(Math.random() * remaining.length)];
+
+            isSpinning = true;
+            stopIdleScroll();
+
+            let spinSpeed = 350;
+
+            function animateSpin() {
+                position += spinSpeed;
+                if (position >= roller.scrollHeight - ITEM_HEIGHT) position = 0;
+                roller.style.transform = `translateY(-${position}px)`;
+                requestAnimationFrame(animateSpin);
+            }
+
+            animateSpin();
+
+            setTimeout(() => {
+                slotBox.classList.add('fade-out');
+                roller.classList.add('fade-out');
+                spinBtn.classList.add('fade-out');
+                loadBtn.classList.add('fade-out');
+
+                setTimeout(() => {
+                    slotBox.classList.add('hidden');
+                    roller.classList.add('hidden');
+                    spinBtn.classList.add('hidden');
+                    loadBtn.classList.add('hidden');
+
+                    finalDisplay.textContent = `${finalNumber}`;
+                    finalDisplay.classList.remove('hidden');
+                    finalDisplay.classList.add('fade-in');
+
+                    used.push(finalNumber);
+                    localStorage.setItem('usedNumbers', JSON.stringify(used));
+
+                }, 1500);
+            }, 5000);
+        }
+
+        // ---------- [🔹 Start] ----------
+        const cachedNumbers = JSON.parse(localStorage.getItem('availableNumbers') || '[]');
+        if (cachedNumbers.length) fillRoller(cachedNumbers);
+        startIdleScroll();
+        spinBtn.addEventListener('click', spin);
+    </script>
+</body>
+
+</html>
